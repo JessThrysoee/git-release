@@ -1,0 +1,149 @@
+#!/bin/bash -e
+
+## on master update minor
+## on release/x.y update patch
+
+VERSION_PROPERTIES=version.properties
+
+## e.g. 2.7
+BRANCH_REGEXP='^release/[0-9]+\.[0-9]+$'
+## e.g. 2.7.5
+VERSION_REGEXP='^[0-9]+(\.[0-9]+){2}$'
+
+BRANCH_TYPE_MASTER=MASTER
+BRANCH_TYPE_RELEASE=RELEASE
+
+warn() {
+   echo "$@" >&2;
+}
+
+die() {
+   warn "$@"; exit 1;
+}
+
+git_current_branch() {
+   git symbolic-ref --short --quiet HEAD
+}
+
+git_current_branch_match() {
+   local regexp="$1"
+
+   if [[ $(git_current_branch) =~ $regexp ]]
+   then
+      return 0
+   fi
+   return 1
+}
+
+is_valid_version() {
+   local version="$1"
+
+   if [[ $version =~ $VERSION_REGEXP ]]
+   then
+      return 0
+   fi
+   return 1
+}
+
+assert_valid_version() {
+   local version="$1"
+
+   if ! is_valid_version "$version"
+   then
+      die "not valid version: $next_version"
+   fi
+}
+
+. $VERSION_PROPERTIES
+assert_valid_version $version
+
+version_split=(${version//\./ })
+major=${version_split[0]}
+minor=${version_split[1]}
+((next_minor=minor+1))
+patch=${version_split[2]}
+((next_patch=patch+1))
+
+curr_version="$major.$minor.$patch"
+if git_current_branch_match "master"
+then
+   # e.g. 2.7.0 -> 2.8.0
+   next_version="$major.$next_minor.0"
+else
+   # e.g. 2.7.3 -> 2.7.4
+   next_version="$major.$minor.$next_patch"
+fi
+
+
+function ask_next_version {
+   declare __outvar="$1"
+   declare curr_version="$2"
+   declare next_version="$3"
+
+   echo "Current version is: $curr_version"
+   read -e -p "Enter next version [$next_version]:" read_version
+   next_version=${read_version:=$next_version}
+
+   assert_valid_version $next_version
+
+   eval "$__outvar=$next_version"
+}
+
+
+
+ask_next_version outvar $curr_version "$next_version"
+next_version=$outvar
+
+
+update_version_properties() {
+   local version="$1"
+   local branch_type="$2"
+
+   printf "# git-releasy generated file\nversion=%s\nbranch_type=%s" $version $branch_type > $VERSION_PROPERTIES
+}
+
+update_version_pom() {
+   local version="$1"
+   local branch_type="$2"
+
+   mvn -q versions:set -DgenerateBackupPoms=false -DnewVersion=$version-$branch_type versions:commit > /dev/null
+}
+
+update_version() {
+   local version="$1"
+   local branch_type="$2"
+
+   # update version.properties
+   update_version_properties $version $BRANCH_TYPE_RELEASE
+   # update pom.xml versions
+   update_version_pom $version $BRANCH_TYPE_RELEASE
+}
+
+## is on master?
+if git_current_branch_match "master"
+then
+   git checkout -b release/$major.$minor
+   update_version $version $BRANCH_TYPE_RELEASE
+   git add -u
+   git commit -m "$version-$BRANCH_TYPE_RELEASE"
+
+
+   git checkout master
+   update_version $next_version $BRANCH_TYPE_MASTER
+   git add -u
+   git commit -m "$next_version-$BRANCH_TYPE_MASTER"
+
+elif git_current_branch_match "$BRANCH_REGEXP"
+then
+
+   update_version $next_version $BRANCH_TYPE_RELEASE
+   git add -u
+   git commit -m "$next_version-$BRANCH_TYPE_RELEASE"
+
+else
+   die "Current branch must master or release/x.y"
+fi
+
+
+
+
