@@ -35,7 +35,7 @@ main() {
    if on_master_branch
    then
       git fetch --quiet
-      assert_git_clean_and_up_to_date
+      assert_git_clean_work_tree
 
       git checkout -b ${RELEASE_BRANCH_PREFIX}${NEXT_BRANCH}
 
@@ -55,7 +55,7 @@ main() {
    then
 
       git fetch --quiet
-      assert_git_clean_and_up_to_date
+      assert_git_clean_work_tree
 
       update_version $NEXT_VERSION
       git add $VERSION_PROPERTIES
@@ -126,6 +126,14 @@ is_git_clean_work_tree () {
 }
 
 #
+assert_git_clean_work_tree() {
+   if ! is_git_clean_work_tree
+   then
+      die "Found unstaged or uncommitted changes"
+   fi
+}
+
+#
 is_git_upstream_branch_configured() {
    git rev-parse --verify HEAD@{upstream} > /dev/null 2>&1
 }
@@ -144,12 +152,7 @@ is_git_upstream_up_to_date() {
 }
 
 #
-assert_git_clean_and_up_to_date() {
-   if ! is_git_clean_work_tree
-   then
-      die "Found unstaged or uncommitted changes"
-   fi
-
+assert_git_upstream_up_to_date() {
    if ! is_git_upstream_up_to_date
    then
       die "Your branch and '$(git_current_upstream_branch)' have diverged"
