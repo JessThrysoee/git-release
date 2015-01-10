@@ -24,6 +24,10 @@ NEXT_BRANCH=
 #--
 
 main() {
+   local toplevel
+
+   git_toplevel toplevel
+   VERSION_PROPERTIES=$toplevel/$VERSION_PROPERTIES
 
    if ! on_master_branch && ! on_release_branch
    then
@@ -33,8 +37,7 @@ main() {
    set_curr_version
    set_next_version
 
-   ask_next_version outvar "$CURR_VERSION" "$NEXT_VERSION"
-   NEXT_VERSION=$outvar
+   ask_next_version NEXT_VERSION "$CURR_VERSION" "$NEXT_VERSION"
 
    ## if on master create a new release branch
    if on_master_branch
@@ -68,8 +71,19 @@ main() {
 
 #
 die() {
-   echo "$@" >&2
+   echo "${0##*/}: $@"" -- exit." >&2
    exit 1;
+}
+
+git_toplevel() {
+   local _outvar="$1"
+   local _toplevel=$(git rev-parse --show-toplevel 2> /dev/null)
+   if [[ -z $_toplevel ]] || [[ ! -d $_toplevel ]]
+   then
+      die "Git toplevel not found. Not a git repository (or any of the parent directories)"
+   fi
+
+   eval "$_outvar=\$_toplevel"
 }
 
 #
@@ -122,12 +136,12 @@ is_git_upstream_up_to_date() {
 assert_git_clean_and_up_to_date() {
    if ! is_git_clean_work_tree
    then
-      die "Found unstaged or uncommitted changes -- exit."
+      die "Found unstaged or uncommitted changes"
    fi
 
    if ! is_git_upstream_up_to_date
    then
-      die "Your branch and '$(git_current_upstream_branch)' have diverged -- exit."
+      die "Your branch and '$(git_current_upstream_branch)' have diverged"
    fi
 }
 
@@ -149,6 +163,9 @@ assert_valid_version() {
 #
 set_curr_version() {
    local version
+
+   require_version_properties
+
    . $VERSION_PROPERTIES
    assert_valid_version $version
 
@@ -179,7 +196,8 @@ set_next_version() {
 
 #
 function ask_next_version {
-   local __outvar="$1"
+   local _outvar="$1"
+   local read_version _next_version
 
    if on_master_branch
    then
@@ -189,11 +207,26 @@ function ask_next_version {
       echo "Current version on '$(git_current_branch)' is: $CURR_VERSION"
       read -e -p "Enter next patch version [$NEXT_VERSION] ?" read_version
    fi
-   next_version=${read_version:=$NEXT_VERSION}
+   _next_version=${read_version:=$NEXT_VERSION}
 
-   assert_valid_version $next_version
+   assert_valid_version $_next_version
 
-   eval "$__outvar=$next_version"
+   eval "$_outvar=\$_next_version"
+}
+
+#
+require_version_properties() {
+   local version init_version read_version
+
+   if [[ ! -f $VERSION_PROPERTIES ]]
+   then
+      init_version=1.0.0
+      read -e -p "${VERSION_PROPERTIES##*/} file not found, create it with version [$init_version] ?" read_version
+      version=${read_version:=$init_version}
+      assert_valid_version $version
+
+      update_version_properties $version
+   fi
 }
 
 #
