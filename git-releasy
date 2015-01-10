@@ -24,15 +24,9 @@ NEXT_BRANCH=
 #--
 
 main() {
-   local toplevel
+   set_version_properties
 
-   git_toplevel toplevel
-   VERSION_PROPERTIES=$toplevel/$VERSION_PROPERTIES
-
-   if ! on_master_branch && ! on_release_branch
-   then
-      die "Current branch must be master or release/x.y"
-   fi
+   require_master_or_release_branch
 
    set_curr_version
    set_next_version
@@ -70,11 +64,20 @@ main() {
 }
 
 #
+require_master_or_release_branch() {
+   if ! on_master_branch && ! on_release_branch
+   then
+      die "Current branch must be master or release/x.y"
+   fi
+}
+
+#
 die() {
    echo "${0##*/}: $@"" -- exit." >&2
    exit 1;
 }
 
+#
 git_toplevel() {
    local _outvar="$1"
    local _toplevel=$(git rev-parse --show-toplevel 2> /dev/null)
@@ -212,6 +215,14 @@ function ask_next_version {
    assert_valid_version $_next_version
 
    eval "$_outvar=\$_next_version"
+}
+
+#
+set_version_properties() {
+   local toplevel
+
+   git_toplevel toplevel
+   VERSION_PROPERTIES=$toplevel/$VERSION_PROPERTIES
 }
 
 #
