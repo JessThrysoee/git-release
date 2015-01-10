@@ -1,9 +1,8 @@
 #!/bin/bash -e
 
 
-# git releasy new
-# git releasy tag
-
+# git releasy new [<repository> [<refspec>...]]
+# git releasy tag [<repository> [<refspec>...]]
 
 #--
 
@@ -24,9 +23,8 @@ NEXT_BRANCH=
 #--
 
 main() {
-   set_version_properties
-
-   require_master_or_release_branch
+   cd_git_toplevel
+   assert_master_or_release_branch
 
    set_curr_version
    set_next_version
@@ -42,11 +40,13 @@ main() {
       git checkout -b ${RELEASE_BRANCH_PREFIX}${NEXT_BRANCH}
 
       update_version $CURR_VERSION
+      git add $VERSION_PROPERTIES
       git add -u
       git commit -m "$CURR_VERSION"
 
       git checkout master
       update_version $NEXT_VERSION $MASTER_VERSION_POSTFIX
+      git add $VERSION_PROPERTIES
       git add -u
       git commit -m "${NEXT_VERSION}${MASTER_VERSION_POSTFIX}"
 
@@ -58,13 +58,14 @@ main() {
       assert_git_clean_and_up_to_date
 
       update_version $NEXT_VERSION
+      git add $VERSION_PROPERTIES
       git add -u
       git commit -m "$NEXT_VERSION"
    fi
 }
 
 #
-require_master_or_release_branch() {
+assert_master_or_release_branch() {
    if ! on_master_branch && ! on_release_branch
    then
       die "Current branch must be master or release/x.y"
@@ -87,6 +88,13 @@ git_toplevel() {
    fi
 
    eval "$_outvar=\$_toplevel"
+}
+
+#
+cd_git_toplevel() {
+   local toplevel
+   git_toplevel toplevel
+   cd $toplevel
 }
 
 #
@@ -167,7 +175,7 @@ assert_valid_version() {
 set_curr_version() {
    local version
 
-   require_version_properties
+   assert_version_properties
 
    . $VERSION_PROPERTIES
    assert_valid_version $version
@@ -218,21 +226,13 @@ function ask_next_version {
 }
 
 #
-set_version_properties() {
-   local toplevel
-
-   git_toplevel toplevel
-   VERSION_PROPERTIES=$toplevel/$VERSION_PROPERTIES
-}
-
-#
-require_version_properties() {
+assert_version_properties() {
    local version init_version read_version
 
    if [[ ! -f $VERSION_PROPERTIES ]]
    then
       init_version=1.0.0
-      read -e -p "${VERSION_PROPERTIES##*/} file not found, create it with version [$init_version] ?" read_version
+      read -e -p "$VERSION_PROPERTIES file not found, create it with version [$init_version] ?" read_version
       version=${read_version:=$init_version}
       assert_valid_version $version
 
