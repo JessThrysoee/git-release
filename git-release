@@ -3,9 +3,24 @@
 #--
 
 RELEASE_BRANCH_PREFIX="release/"
-MAVEN_VERSION_POSTFIX="-SNAPSHOT"
 
-RELEASE_PROPERTIES=release.properties
+MASTER_VERSION_POSTFIX="-SNAPSHOT"
+RELEASE_VERSION_POSTFIX=""
+
+# If an executable is found at $GIT_RELEASE_HOOK, then it is called after git-release changes
+# the version variable in $GIT_RELEASE_PROPERTIES but before the new version is commited.
+# The arguments to the hook are the version and a version_postfix (e.g. $MASTER_VERSION_POSTFIX).
+#
+# Here is an example hook that updates a branch with the Versions Maven Plugin:
+#
+#    #!/bin/bash
+#
+#    version="$1"
+#    postfix="$2"
+#    mvn -q versions:set -DgenerateBackupPoms=false -DnewVersion=${version}${postfix} versions:commit > /dev/null
+#
+GIT_RELEASE_HOOK="./git-release-hook"
+GIT_RELEASE_PROPERTIES="git-release.properties"
 
 ## e.g. 2.7
 RELEASE_BRANCH_REGEXP='^'$RELEASE_BRANCH_PREFIX'[0-9]+\.[0-9]+$'
@@ -70,16 +85,16 @@ subcommand_branch() {
 
    git checkout -b ${RELEASE_BRANCH_PREFIX}${NEXT_BRANCH}
 
-   update_version $CURR_VERSION
-   git add $RELEASE_PROPERTIES
+   update_version $CURR_VERSION $RELEASE_VERSION_POSTFIX
+   git add $GIT_RELEASE_PROPERTIES
    git add -u
-   git commit -m "$CURR_VERSION"
+   git commit -m "${CURR_VERSION}${RELEASE_VERSION_POSTFIX}"
 
    git checkout master
-   update_version $NEXT_VERSION $MAVEN_VERSION_POSTFIX
-   git add $RELEASE_PROPERTIES
+   update_version $NEXT_VERSION $MASTER_VERSION_POSTFIX
+   git add $GIT_RELEASE_PROPERTIES
    git add -u
-   git commit -m "${NEXT_VERSION}${MAVEN_VERSION_POSTFIX}"
+   git commit -m "${NEXT_VERSION}${MASTER_VERSION_POSTFIX}"
 }
 
 # on release/x.y tag a new version
@@ -101,10 +116,10 @@ f,force       replace the tag if exists"
 
    git tag "$@" $CURR_VERSION
 
-   update_version $NEXT_VERSION
-   git add $RELEASE_PROPERTIES
+   update_version $NEXT_VERSION $RELEASE_VERSION_POSTFIX
+   git add $GIT_RELEASE_PROPERTIES
    git add -u
-   git commit -m "$NEXT_VERSION"
+   git commit -m "${NEXT_VERSION}${RELEASE_VERSION_POSTFIX}"
 }
 
 #
@@ -200,7 +215,7 @@ set_curr_version() {
 
    assert_release_properties
 
-   . $RELEASE_PROPERTIES
+   . $GIT_RELEASE_PROPERTIES
    assert_valid_version $version
 
    CURR_VERSION=$version
@@ -241,7 +256,7 @@ function ask_next_version {
       echo "Tag branch with version: $CURR_VERSION"
    fi
 
-   read -e -p "and prepare '$(git_current_branch)' for future version: [$NEXT_VERSION] ?" read_version
+   read -e -p "and prepare '$(git_current_branch)' for future version: [$NEXT_VERSION] ? " read_version
    _next_version=${read_version:=$NEXT_VERSION}
 
    assert_valid_version $_next_version
@@ -253,10 +268,10 @@ function ask_next_version {
 assert_release_properties() {
    local version init_version read_version
 
-   if [[ ! -f $RELEASE_PROPERTIES ]]
+   if [[ ! -f $GIT_RELEASE_PROPERTIES ]]
    then
       init_version=1.0.0
-      read -e -p "$RELEASE_PROPERTIES file not found, create it with version [$init_version] ?" read_version
+      read -e -p "$GIT_RELEASE_PROPERTIES file not found, create it with version [$init_version] ? " read_version
       version=${read_version:=$init_version}
       assert_valid_version $version
 
@@ -267,14 +282,7 @@ assert_release_properties() {
 #
 update_release_properties() {
    local version="$1"
-   printf "# git-release generated file\nversion=%s\n" $version > $RELEASE_PROPERTIES
-}
-
-#
-update_release_pom() {
-   local version="$1"
-   local postfix="$2"
-   mvn -q versions:set -DgenerateBackupPoms=false -DnewVersion=${version}${postfix} versions:commit > /dev/null
+   printf "# git-release generated file\nversion=%s\n" $version > $GIT_RELEASE_PROPERTIES
 }
 
 #
@@ -283,7 +291,11 @@ update_version() {
    local postfix="$2"
 
    update_release_properties $version
-   update_release_pom $version $postfix
+
+   if [[ -x $GIT_RELEASE_HOOK ]]
+   then
+       $GIT_RELEASE_HOOK $version $postfix
+   fi
 }
 
 main "$@"
