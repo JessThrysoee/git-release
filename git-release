@@ -63,7 +63,7 @@ subcommand_branch() {
    set_curr_version
    set_next_version
 
-   ask_next_version NEXT_VERSION "$CURR_VERSION" "$NEXT_VERSION"
+   ask_next_version NEXT_VERSION "branch"
 
    git checkout -b ${RELEASE_BRANCH_PREFIX}${NEXT_BRANCH}
 
@@ -96,7 +96,7 @@ f,force         replace the tag if exists"
    set_curr_version
    set_next_version
 
-   ask_next_version NEXT_VERSION "$CURR_VERSION" "$NEXT_VERSION"
+   ask_next_version NEXT_VERSION "tag"
 
    git tag "$@" $CURR_VERSION
 
@@ -230,16 +230,17 @@ set_next_version() {
 #
 function ask_next_version {
    local _outvar="$1"
+   local subcommand="$2"
    local read_version _next_version
 
-   if on_master_branch
+   if [[ $subcommand == "branch" ]]
    then
       echo "Create new release branch: '${RELEASE_BRANCH_PREFIX}${NEXT_BRANCH}'"
-      read -e -p "and prepare '$(git_current_branch)' for future version: [$NEXT_VERSION] ?" read_version
    else
-      echo "Current version on '$(git_current_branch)' is: $CURR_VERSION"
-      read -e -p "Enter next patch version [$NEXT_VERSION] ?" read_version
+      echo "Tag branch with version: $CURR_VERSION"
    fi
+
+   read -e -p "and prepare '$(git_current_branch)' for future version: [$NEXT_VERSION] ?" read_version
    _next_version=${read_version:=$NEXT_VERSION}
 
    assert_valid_version $_next_version
