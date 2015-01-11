@@ -107,32 +107,8 @@ f,force         replace the tag if exists"
 }
 
 #
-assert_master_or_release_branch() {
-   if ! on_master_branch && ! on_release_branch
-   then
-      die "current branch must be master or release/x.y"
-   fi
-}
-
-#
-assert_master_branch() {
-   if ! on_master_branch
-   then
-      die "current branch must be master"
-   fi
-}
-
-#
-assert_release_branch() {
-   if ! on_release_branch
-   then
-      die "current branch must be release/x.y"
-   fi
-}
-
-#
 die() {
-   echo "${0##*/}: $@"" -- exit." >&2
+   echo "${0##*/}: $@ -- exit." >&2
    exit 1;
 }
 
@@ -156,11 +132,6 @@ cd_git_toplevel() {
 }
 
 #
-git_current_upstream_branch() {
-   git rev-parse --abbrev-ref HEAD@{upstream}
-}
-
-#
 git_current_branch() {
    git symbolic-ref --short --quiet HEAD
 }
@@ -171,8 +142,24 @@ on_master_branch() {
 }
 
 #
+assert_master_branch() {
+   if ! on_master_branch
+   then
+      die "current branch must be master"
+   fi
+}
+
+#
 on_release_branch() {
    [[ $(git_current_branch) =~ $RELEASE_BRANCH_REGEXP ]]
+}
+
+#
+assert_release_branch() {
+   if ! on_release_branch
+   then
+      die "current branch must be release/x.y"
+   fi
 }
 
 #
@@ -188,32 +175,6 @@ assert_git_clean_work_tree() {
    if ! is_git_clean_work_tree
    then
       die "found unstaged or uncommitted changes"
-   fi
-}
-
-#
-is_git_upstream_branch_configured() {
-   git rev-parse --verify HEAD@{upstream} > /dev/null 2>&1
-}
-
-#
-is_git_upstream_up_to_date() {
-   is_git_upstream_branch_configured || return 0
-
-   git rev-list HEAD@{upstream}..HEAD | grep -q .
-   [[ $? != 1 ]] && return 1
-
-   git rev-list HEAD..HEAD@{upstream} | grep -q .
-   [[ $? != 1 ]] && return 1
-
-   return 0
-}
-
-#
-assert_git_upstream_up_to_date() {
-   if ! is_git_upstream_up_to_date
-   then
-      die "your branch and '$(git_current_upstream_branch)' have diverged"
    fi
 }
 
@@ -324,5 +285,4 @@ update_version() {
 }
 
 main "$@"
-
 
