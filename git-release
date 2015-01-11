@@ -267,7 +267,7 @@ function ask_next_version {
    fi
 
    read -e -p "and prepare '$(git_current_branch)' for future version: [$NEXT_VERSION] ? " read_version
-   _next_version=${read_version:=$NEXT_VERSION}
+   _next_version=${read_version:-$NEXT_VERSION}
 
    assert_valid_version $_next_version
 
@@ -282,7 +282,7 @@ assert_release_properties() {
    then
       init_version=1.0.0
       read -e -p "$GIT_RELEASE_PROPERTIES file not found, create it with version [$init_version] ? " read_version
-      version=${read_version:=$init_version}
+      version=${read_version:-$init_version}
       assert_valid_version $version
 
       update_release_properties $version
