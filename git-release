@@ -85,13 +85,15 @@ subcommand() {
 
 # on master create a new release/x.y branch
 subcommand_branch() {
+   local subcommand="branch"
+
    assert_master_branch
    assert_git_clean_work_tree
 
    set_curr_version
-   set_next_version
+   set_next_version $subcommand
 
-   ask_next_version NEXT_VERSION "branch"
+   ask_next_version NEXT_VERSION $subcommand
 
    git checkout -b ${RELEASE_BRANCH_PREFIX}${NEXT_BRANCH}
 
@@ -109,6 +111,8 @@ subcommand_branch() {
 
 # on release/x.y tag a new version
 subcommand_tag() {
+   local subcommand="tag"
+
    local opts_spec="\
 git release tag [-f] [-m <msg>]
 --
@@ -120,9 +124,9 @@ f,force       replace the tag if exists"
    assert_git_clean_work_tree
 
    set_curr_version
-   set_next_version
+   set_next_version $subcommand
 
-   ask_next_version NEXT_VERSION "tag"
+   ask_next_version NEXT_VERSION $subcommand
 
    git tag "$@" $CURR_VERSION
 
@@ -233,6 +237,7 @@ set_curr_version() {
 
 #
 set_next_version() {
+   local subcommand="$1"
    local split major minor patch
 
    split=(${CURR_VERSION//\./ })
@@ -240,7 +245,7 @@ set_next_version() {
    minor=${split[1]}
    patch=${split[2]}
 
-   if on_master_branch
+   if [[ $subcommand == "branch" ]]
    then
       # e.g. 2.7
       NEXT_BRANCH="$major.$minor"
