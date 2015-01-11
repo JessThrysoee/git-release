@@ -3,7 +3,8 @@
 #
 usage() {
    cat <<EOF
-usage: git release branch
+usage: git release version
+   or: git release branch
    or: git release tag [-f] [-m <msg>]
 
     Simple release oriented workflow.
@@ -63,6 +64,10 @@ main() {
 #
 subcommand() {
    case "$1" in
+      version)
+         shift
+         subcommand_version "$@"
+         ;;
       branch)
          shift
          subcommand_branch "$@"
@@ -84,6 +89,25 @@ subcommand() {
 }
 
 # on master create a new release/x.y branch
+subcommand_version() {
+   local subcommand="version"
+
+   assert_master_branch
+   assert_git_clean_work_tree
+
+   set_curr_version
+   set_next_version $subcommand
+
+   ask_next_version NEXT_VERSION $subcommand
+
+   # on master
+   update_version $NEXT_VERSION $MASTER_VERSION_POSTFIX
+   git add $GIT_RELEASE_PROPERTIES
+   git add -u
+   git commit -m "${NEXT_VERSION}${MASTER_VERSION_POSTFIX}"
+}
+
+# on master create a new release/x.y branch
 subcommand_branch() {
    local subcommand="branch"
 
@@ -95,13 +119,14 @@ subcommand_branch() {
 
    ask_next_version NEXT_VERSION $subcommand
 
+   # on release/x.y
    git checkout -b ${RELEASE_BRANCH_PREFIX}${NEXT_BRANCH}
-
    update_version $CURR_VERSION $RELEASE_VERSION_POSTFIX
    git add $GIT_RELEASE_PROPERTIES
    git add -u
    git commit -m "${CURR_VERSION}${RELEASE_VERSION_POSTFIX}"
 
+   # on master
    git checkout master
    update_version $NEXT_VERSION $MASTER_VERSION_POSTFIX
    git add $GIT_RELEASE_PROPERTIES
@@ -128,8 +153,8 @@ f,force       replace the tag if exists"
 
    ask_next_version NEXT_VERSION $subcommand
 
+   # on release/x.y
    git tag "$@" $CURR_VERSION
-
    update_version $NEXT_VERSION $RELEASE_VERSION_POSTFIX
    git add $GIT_RELEASE_PROPERTIES
    git add -u
@@ -245,7 +270,7 @@ set_next_version() {
    minor=${split[1]}
    patch=${split[2]}
 
-   if [[ $subcommand == "branch" ]]
+   if [[ $subcommand == "branch" || $subcommand == version ]]
    then
       # e.g. 2.7
       NEXT_BRANCH="$major.$minor"
@@ -267,11 +292,13 @@ function ask_next_version {
    if [[ $subcommand == "branch" ]]
    then
       echo "Create new release branch: '${RELEASE_BRANCH_PREFIX}${NEXT_BRANCH}'"
-   else
+
+   elif [[ $subcommand == "tag" ]]
+   then
       echo "Tag branch with version: $CURR_VERSION"
    fi
 
-   read -e -p "and prepare '$(git_current_branch)' for future version: [$NEXT_VERSION] ? " read_version
+   read -e -p "Prepare '$(git_current_branch)' for future version: [$NEXT_VERSION] ? " read_version
    _next_version=${read_version:-$NEXT_VERSION}
 
    assert_valid_version $_next_version
