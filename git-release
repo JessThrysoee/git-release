@@ -1,8 +1,5 @@
 #!/bin/bash -e
 
-# git release branch
-# git release tag [-f] [-m <msg>]
-
 #--
 
 RELEASE_BRANCH_PREFIX="release/"
@@ -22,6 +19,17 @@ NEXT_BRANCH=
 #--
 
 #
+usage() {
+   cat <<EOF
+usage: git release branch
+   or: git release tag [-f] [-m <msg>]
+
+    Simple release oriented workflow.
+
+EOF
+}
+
+#
 main() {
    cd_git_toplevel
    subcommand "$@"
@@ -29,15 +37,6 @@ main() {
 
 #
 subcommand() {
-   local opts_spec="\
-git release branch
-git release tag [-f] [-m <msg>]
-
-Simple release oriented workflow.
---"
-   eval "$(echo "$opts_spec" | git rev-parse --parseopt --stop-at-non-option -- "$@" || echo exit $?)"
-
-   shift
    case "$1" in
       branch)
          shift
@@ -47,9 +46,13 @@ Simple release oriented workflow.
          shift
          subcommand_tag "$@"
          ;;
+      -h | --help)
+         usage
+         exit 0
+         ;;
       *)
          echo "error: Unknown subcommand: '$1'"
-         eval "$(echo "$opts_spec" | git rev-parse --parseopt -- -h)"
+         usage
          exit 1
          ;;
    esac
@@ -83,11 +86,9 @@ subcommand_branch() {
 subcommand_tag() {
    local opts_spec="\
 git release tag [-f] [-m <msg>]
-
-Simple release oriented workflow.
 --
 m,message=msg tag message
-f,force         replace the tag if exists"
+f,force       replace the tag if exists"
    eval "$(echo "$opts_spec" | git rev-parse --parseopt -- "$@" || echo exit $?)"
 
    assert_release_branch
