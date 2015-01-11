@@ -1,13 +1,12 @@
 #!/bin/bash -e
 
-
-# git release new [<repository> [<refspec>...]]
-# git release tag [<repository> [<refspec>...]]
+# git release branch
+# git release tag [-f] [-m <msg>]
 
 #--
 
 RELEASE_BRANCH_PREFIX="release/"
-MASTER_VERSION_POSTFIX="-SNAPSHOT"
+MAVEN_VERSION_POSTFIX="-SNAPSHOT"
 
 RELEASE_PROPERTIES=release.properties
 
@@ -22,53 +21,112 @@ NEXT_BRANCH=
 
 #--
 
+#
 main() {
    cd_git_toplevel
-   assert_master_or_release_branch
+   subcommand "$@"
+}
+
+#
+subcommand() {
+   local opts_spec="\
+git release branch
+git release tag [-f] [-m <msg>]
+
+Simple release oriented workflow.
+--"
+   eval "$(echo "$opts_spec" | git rev-parse --parseopt --stop-at-non-option -- "$@" || echo exit $?)"
+
+   shift
+   case "$1" in
+      branch)
+         shift
+         subcommand_branch "$@"
+         ;;
+      tag)
+         shift
+         subcommand_tag "$@"
+         ;;
+      *)
+         echo "error: Unknown subcommand: '$1'"
+         eval "$(echo "$opts_spec" | git rev-parse --parseopt -- -h)"
+         exit 1
+         ;;
+   esac
+}
+
+# on master create a new release/x.y branch
+subcommand_branch() {
+   assert_master_branch
+   assert_git_clean_work_tree
 
    set_curr_version
    set_next_version
 
    ask_next_version NEXT_VERSION "$CURR_VERSION" "$NEXT_VERSION"
 
-   ## if on master create a new release branch
-   if on_master_branch
-   then
-      git fetch --quiet
-      assert_git_clean_work_tree
+   git checkout -b ${RELEASE_BRANCH_PREFIX}${NEXT_BRANCH}
 
-      git checkout -b ${RELEASE_BRANCH_PREFIX}${NEXT_BRANCH}
+   update_version $CURR_VERSION
+   git add $RELEASE_PROPERTIES
+   git add -u
+   git commit -m "$CURR_VERSION"
 
-      update_version $CURR_VERSION
-      git add $RELEASE_PROPERTIES
-      git add -u
-      git commit -m "$CURR_VERSION"
+   git checkout master
+   update_version $NEXT_VERSION $MAVEN_VERSION_POSTFIX
+   git add $RELEASE_PROPERTIES
+   git add -u
+   git commit -m "${NEXT_VERSION}${MAVEN_VERSION_POSTFIX}"
+}
 
-      git checkout master
-      update_version $NEXT_VERSION $MASTER_VERSION_POSTFIX
-      git add $RELEASE_PROPERTIES
-      git add -u
-      git commit -m "${NEXT_VERSION}${MASTER_VERSION_POSTFIX}"
+# on release/x.y tag a new version
+subcommand_tag() {
+   local opts_spec="\
+git release tag [-f] [-m <msg>]
 
-   ## if on release branch create a new patch version
-   elif on_release_branch
-   then
+Simple release oriented workflow.
+--
+m,message=msg tag message
+f,force         replace the tag if exists"
+   eval "$(echo "$opts_spec" | git rev-parse --parseopt -- "$@" || echo exit $?)"
 
-      git fetch --quiet
-      assert_git_clean_work_tree
+   assert_release_branch
+   assert_git_clean_work_tree
 
-      update_version $NEXT_VERSION
-      git add $RELEASE_PROPERTIES
-      git add -u
-      git commit -m "$NEXT_VERSION"
-   fi
+   set_curr_version
+   set_next_version
+
+   ask_next_version NEXT_VERSION "$CURR_VERSION" "$NEXT_VERSION"
+
+   git tag "$@" $CURR_VERSION
+
+   update_version $NEXT_VERSION
+   git add $RELEASE_PROPERTIES
+   git add -u
+   git commit -m "$NEXT_VERSION"
 }
 
 #
 assert_master_or_release_branch() {
    if ! on_master_branch && ! on_release_branch
    then
-      die "Current branch must be master or release/x.y"
+      die "current branch must be master or release/x.y"
+   fi
+}
+
+#
+assert_master_branch() {
+   if ! on_master_branch
+   then
+      die "current branch must be master"
+   fi
+}
+
+#
+assert_release_branch() {
+   if ! on_release_branch
+   then
+      die "current branch must be release/x.y"
    fi
 }
 
@@ -84,7 +142,7 @@ git_toplevel() {
    local _toplevel=$(git rev-parse --show-toplevel 2> /dev/null)
    if [[ -z $_toplevel ]] || [[ ! -d $_toplevel ]]
    then
-      die "Git toplevel not found. Not a git repository (or any of the parent directories)"
+      die "git toplevel not found. Not a git repository (or any of the parent directories)"
    fi
 
    eval "$_outvar=\$_toplevel"
@@ -129,7 +187,7 @@ is_git_clean_work_tree () {
 assert_git_clean_work_tree() {
    if ! is_git_clean_work_tree
    then
-      die "Found unstaged or uncommitted changes"
+      die "found unstaged or uncommitted changes"
    fi
 }
 
@@ -155,7 +213,7 @@ is_git_upstream_up_to_date() {
 assert_git_upstream_up_to_date() {
    if ! is_git_upstream_up_to_date
    then
-      die "Your branch and '$(git_current_upstream_branch)' have diverged"
+      die "your branch and '$(git_current_upstream_branch)' have diverged"
    fi
 }
 
@@ -265,6 +323,6 @@ update_version() {
    update_release_pom $version $postfix
 }
 
-main
+main "$@"
 
 
