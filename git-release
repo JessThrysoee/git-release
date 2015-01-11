@@ -1,38 +1,5 @@
 #!/bin/bash -e
 
-#--
-
-RELEASE_BRANCH_PREFIX="release/"
-
-MASTER_VERSION_POSTFIX="-SNAPSHOT"
-RELEASE_VERSION_POSTFIX=""
-
-# If an executable is found at $GIT_RELEASE_HOOK, then it is called after git-release changes
-# the version variable in $GIT_RELEASE_PROPERTIES but before the new version is commited.
-# The arguments to the hook are the version and a version_postfix (e.g. $MASTER_VERSION_POSTFIX).
-#
-# Here is an example hook that updates a branch with the Versions Maven Plugin:
-#
-#    #!/bin/bash
-#
-#    version="$1"
-#    postfix="$2"
-#    mvn -q versions:set -DgenerateBackupPoms=false -DnewVersion=${version}${postfix} versions:commit > /dev/null
-#
-GIT_RELEASE_HOOK="./git-release-hook"
-GIT_RELEASE_PROPERTIES="git-release.properties"
-
-## e.g. 2.7
-RELEASE_BRANCH_REGEXP='^'$RELEASE_BRANCH_PREFIX'[0-9]+\.[0-9]+$'
-## e.g. 2.7.5
-VERSION_REGEXP='^[0-9]+(\.[0-9]+){2}$'
-
-CURR_VERSION=
-NEXT_VERSION=
-NEXT_BRANCH=
-
-#--
-
 #
 usage() {
    cat <<EOF
@@ -45,7 +12,50 @@ EOF
 }
 
 #
+init() {
+   get_config RELEASE_BRANCH_PREFIX "release-branch-prefix" "release/"
+
+   get_config MASTER_VERSION_POSTFIX "master_version_postfix" "-SNAPSHOT"
+   get_config RELEASE_VERSION_POSTFIX "release_version_postfix" ""
+
+   # If an executable is found at $GIT_RELEASE_HOOK, then it is called after git-release changes
+   # the version variable in $GIT_RELEASE_PROPERTIES but before the new version is commited.
+   # The arguments to the hook are the version and a version_postfix (e.g. $MASTER_VERSION_POSTFIX).
+   #
+   # Here is an example hook that updates a branch with the Versions Maven Plugin:
+   #
+   #    #!/bin/bash
+   #
+   #    version="$1"
+   #    postfix="$2"
+   #    mvn -q versions:set -DgenerateBackupPoms=false -DnewVersion=${version}${postfix} versions:commit > /dev/null
+   #
+   get_config GIT_RELEASE_HOOK "git_release_hook" "./git-release-hook"
+   get_config GIT_RELEASE_PROPERTIES "git_release_properties" "git-release.properties"
+
+   ## e.g. 2.7
+   RELEASE_BRANCH_REGEXP='^'$RELEASE_BRANCH_PREFIX'[0-9]+\.[0-9]+$'
+   ## e.g. 2.7.5
+   VERSION_REGEXP='^[0-9]+(\.[0-9]+){2}$'
+
+   CURR_VERSION=
+   NEXT_VERSION=
+   NEXT_BRANCH=
+}
+
+#
+get_config() {
+   local _outvar="$1"
+   local key="$2"
+   local default="$3"
+
+   _value=$(git config --get git-release.$key 2> /dev/null || echo "$default")
+   eval "$_outvar=\$_value"
+}
+
+#
 main() {
+   init
    cd_git_toplevel
    subcommand "$@"
 }
