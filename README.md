@@ -1,4 +1,4 @@
 ###Homebrew installation
 
-    brew tap jessthrysoee/git-release
+    brew tap jessthrysoee/tap
     brew install git-release
