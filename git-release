@@ -124,7 +124,8 @@ subcommand_branch() {
    update_version $CURR_VERSION $RELEASE_VERSION_POSTFIX
    git add $GIT_RELEASE_PROPERTIES
    git add -u
-   git commit -m "${CURR_VERSION}${RELEASE_VERSION_POSTFIX}"
+   # if GIT_RELEASE_HOOK has not changed anything this may be empty
+   git commit --allow-empty -m "${CURR_VERSION}${RELEASE_VERSION_POSTFIX}"
 
    # on master
    git checkout master
