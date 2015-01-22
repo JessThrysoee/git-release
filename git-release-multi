@@ -1,0 +1,128 @@
+#!/bin/bash -e
+
+#
+usage() {
+   cat <<EOF
+usage: git-release-multi branch [GIT_WORK_TREE...]
+   or: git-release-multi tag [-f|--force] [-m|--message <msg>] [GIT_WORK_TREE...]
+   or: git-release-multi set-version [v|--version <version>] [GIT_WORK_TREE...]
+
+    Simple release oriented workflow.
+EOF
+}
+
+#
+main() {
+   subcommand "$@"
+}
+
+#
+subcommand() {
+   case "$1" in
+      set-version)
+         shift
+         subcommand_set_version "$@"
+         ;;
+      branch)
+         shift
+         subcommand_branch "$@"
+         ;;
+      tag)
+         shift
+         subcommand_tag "$@"
+         ;;
+      -h | --help)
+         usage
+         exit 0
+         ;;
+      *)
+         echo "error: unknown subcommand: '$1'"
+         usage
+         exit 1
+         ;;
+   esac
+}
+
+#
+subcommand_set_version() {
+   local subcommand="set-version"
+   local arg opts_spec version git_work_tree
+
+   local opts_spec="\
+git-release-multi set-version [v|--version <version>] [GIT_WORK_TREE...]
+--
+v,version=version the new version"
+   eval "$(echo "$opts_spec" | git rev-parse --parseopt -- "$@" || echo exit $?)"
+
+   while :
+   do
+      arg="$1"
+      shift
+
+      case $arg in
+         -v)
+            version="$1"
+            shift
+            ;;
+         --)
+            break
+            ;;
+         *)
+            break
+            ;;
+      esac
+   done
+
+   for git_work_tree
+   do
+      echo "--- $git_work_tree ---"
+      git -C "$git_work_tree" release set-version $version
+      echo "$? returnvalue"
+   done
+}
+
+#
+subcommand_branch() {
+   local git_work_tree
+
+   for git_work_tree
+   do
+      echo "--- $git_work_tree ---"
+      git -C "$git_work_tree" release branch
+   done
+}
+
+#
+subcommand_tag() {
+   local arg opts_spec opts git_work_tree
+
+   opts_spec="\
+git-release-multi tag [-f|--force] [-m|--message <msg>] [GIT_WORK_TREE...]
+--
+m,message=msg tag message
+f,force       replace the tag if exists"
+   eval "$(echo "$opts_spec" | git rev-parse --parseopt -- "$@" || echo exit $?)"
+
+   opts=()
+   for arg
+   do
+      case $arg in
+         --)
+            shift
+            break
+            ;;
+         *)
+            opts+=($arg)
+            shift
+            ;;
+      esac
+   done
+
+   for git_work_tree
+   do
+      echo "--- $git_work_tree ---"
+      git -C "$git_work_tree" release tag "${opts[@]}"
+   done
+}
+
+main "$@"
