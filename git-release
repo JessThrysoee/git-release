@@ -4,8 +4,8 @@
 usage() {
    cat <<EOF
 usage: git release branch
-   or: git release tag [-f] [-m <msg>]
-   or: git release set-version [--version <version>]
+   or: git release tag [-f|--force] [-m|--message <msg>]
+   or: git release set-version <version>
 
     Simple release oriented workflow.
 
@@ -91,12 +91,7 @@ subcommand() {
 # on master set new version, e.g. use to bump major version
 subcommand_set_version() {
    local subcommand="set-version"
-
-   local opts_spec="\
-git release set-version [--version <version>]
---
-v,version=version the new version"
-   eval "$(echo "$opts_spec" | git rev-parse --parseopt -- "$@" || echo exit $?)"
+   local next_version="$1"
 
    assert_master_branch
    assert_git_clean_work_tree
@@ -104,25 +99,9 @@ v,version=version the new version"
    set_curr_version
    set_next_version $subcommand
 
-   local next_version
-   while [[ $# > 1 ]]
-   do
-      name="$1"
-      shift
-
-      case $name in
-         -v)
-            next_version="$1"
-            assert_valid_version $next_version
-            shift
-            ;;
-         *)
-            ;;
-      esac
-   done
-
    if [[ -n $next_version ]]
    then
+      assert_valid_version $next_version
       NEXT_VERSION=$next_version
    else
       ask_next_version NEXT_VERSION $subcommand
@@ -132,7 +111,7 @@ v,version=version the new version"
    update_version $NEXT_VERSION $MASTER_VERSION_POSTFIX
    git add $GIT_RELEASE_PROPERTIES
    git add -u
-   git commit -m "${NEXT_VERSION}${MASTER_VERSION_POSTFIX}"
+   git commit -m "${NEXT_VERSION}${MASTER_VERSION_POSTFIX}" || true
 }
 
 # from master create a new 'release/major.minor' branch and bump version to 'major.(minor+1).0' on master
