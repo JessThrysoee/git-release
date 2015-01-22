@@ -313,7 +313,7 @@ assert_release_properties() {
 
    if [[ ! -f $GIT_RELEASE_PROPERTIES ]]
    then
-      init_version=1.0.0
+      init_version=0.0.1
       read -e -p "$GIT_RELEASE_PROPERTIES file not found, create it with version [$init_version] ? " read_version
       version=${read_version:-$init_version}
       assert_valid_version $version
