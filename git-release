@@ -111,7 +111,9 @@ subcommand_set_version() {
    update_version $NEXT_VERSION $MASTER_VERSION_POSTFIX
    git add $GIT_RELEASE_PROPERTIES
    git add -u
-   git commit -m "${NEXT_VERSION}${MASTER_VERSION_POSTFIX}" || true
+   git commit -q -m "${NEXT_VERSION}${MASTER_VERSION_POSTFIX}" || true
+
+   subcommand_set_version_status
 }
 
 # from master create a new 'release/major.minor' branch and bump version to 'major.(minor+1).0' on master
@@ -125,19 +127,21 @@ subcommand_branch() {
    set_next_version $subcommand
 
    # on 'release/major.minor'
-   git checkout -b ${RELEASE_BRANCH_PREFIX}${NEXT_BRANCH}
+   git checkout -q -b ${RELEASE_BRANCH_PREFIX}${NEXT_BRANCH}
    update_version $CURR_VERSION $RELEASE_VERSION_POSTFIX
    git add $GIT_RELEASE_PROPERTIES
    git add -u
    # if GIT_RELEASE_HOOK has not changed anything this may be empty
-   git commit --allow-empty -m "${CURR_VERSION}${RELEASE_VERSION_POSTFIX}"
+   git commit -q --allow-empty -m "${CURR_VERSION}${RELEASE_VERSION_POSTFIX}"
 
    # on master
-   git checkout master
+   git checkout -q master
    update_version $NEXT_VERSION $MASTER_VERSION_POSTFIX
    git add $GIT_RELEASE_PROPERTIES
    git add -u
-   git commit -m "${NEXT_VERSION}${MASTER_VERSION_POSTFIX}"
+   git commit -q -m "${NEXT_VERSION}${MASTER_VERSION_POSTFIX}"
+
+   subcommand_branch_status
 }
 
 # on 'release/major.minor' tag a new version and bump version to 'major.minor.(patch+1)'
@@ -163,7 +167,9 @@ f,force       replace the tag if exists"
    update_version $NEXT_VERSION $RELEASE_VERSION_POSTFIX
    git add $GIT_RELEASE_PROPERTIES
    git add -u
-   git commit -m "${NEXT_VERSION}${RELEASE_VERSION_POSTFIX}"
+   git commit -q -m "${NEXT_VERSION}${RELEASE_VERSION_POSTFIX}"
+
+   subcommand_tag_status
 }
 
 #
@@ -337,6 +343,59 @@ update_version() {
        $GIT_RELEASE_HOOK $version $postfix
    fi
 }
+
+maxlen() {
+   local m
+   for s; do
+      ((m = m > ${#s} ? m : ${#s}))
+   done
+   echo $m
+}
+
+subcommand_set_version_status() {
+   print_status\
+      "${CURR_VERSION}${MASTER_VERSION_POSTFIX}"\
+      "${NEXT_VERSION}${MASTER_VERSION_POSTFIX}"\
+      - - -
+}
+
+subcommand_branch_status() {
+   print_status\
+      "${CURR_VERSION}${MASTER_VERSION_POSTFIX}"\
+      "${NEXT_VERSION}${MASTER_VERSION_POSTFIX}"\
+      "${RELEASE_BRANCH_PREFIX}${NEXT_BRANCH}"\
+      -\
+      "${CURR_VERSION}${RELEASE_VERSION_POSTFIX}"
+}
+
+subcommand_tag_status() {
+   print_status\
+      - -\
+      $(git_current_branch)\
+      "${CURR_VERSION}${RELEASE_VERSION_POSTFIX}"\
+      "${NEXT_VERSION}${RELEASE_VERSION_POSTFIX}"
+}
+
+print_status() {
+   local blen plen clen
+   local master_curr_version="$1"
+   local master_next_version="$2"
+
+   local release_branch_name="$3"
+   local release_curr_version="$4"
+   local release_next_version="$5"
+
+
+   blen=$(maxlen master $release_branch_name)
+   plen=$(maxlen previous $master_curr_version $release_curr_version)
+   clen=$(maxlen current $master_next_version $release_next_version)
+
+   printf "\nstatus:\n"
+   printf "%-"${blen}"s  %-"${plen}"s  %-"${clen}"s\n" ""                   previous              current
+   printf "%-"${blen}"s  %-"${plen}"s  %-"${clen}"s\n" master               $master_curr_version  $master_next_version
+   printf "%-"${blen}"s  %-"${plen}"s  %-"${clen}"s\n" $release_branch_name $release_curr_version $release_next_version
+}
+
 
 main "$@"
 
