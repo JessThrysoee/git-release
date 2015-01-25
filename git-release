@@ -96,14 +96,14 @@ subcommand_set_version() {
    assert_master_branch
    assert_git_clean_work_tree
 
-   set_curr_version
-   set_next_version $subcommand
+   set_curr_version $next_version
 
    if [[ -n $next_version ]]
    then
       assert_valid_version $next_version
       NEXT_VERSION=$next_version
    else
+      set_next_version $subcommand
       ask_next_version NEXT_VERSION $subcommand
    fi
 
@@ -261,9 +261,9 @@ assert_valid_version() {
 
 #
 set_curr_version() {
-   local version
+   local version="$1"
 
-   assert_release_properties
+   assert_release_properties $version
 
    . $GIT_RELEASE_PROPERTIES
    assert_valid_version $version
@@ -311,14 +311,20 @@ function ask_next_version {
 #
 assert_release_properties() {
    local version init_version read_version
+   local init_version="$1"
 
    if [[ ! -f $GIT_RELEASE_PROPERTIES ]]
    then
-      init_version=0.0.1
-      read -e -p "$GIT_RELEASE_PROPERTIES file not found, create it with version [$init_version] ? " read_version
-      version=${read_version:-$init_version}
-      assert_valid_version $version
+      if [[ -n $init_version ]]
+      then
+         version=$init_version
+      else
+         init_version=0.1.0
+         read -e -p "$GIT_RELEASE_PROPERTIES file not found, create it with version [$init_version] ? " read_version
+         version=${read_version:-$init_version}
+      fi
 
+      assert_valid_version $version
       update_release_properties $version
    fi
 }
