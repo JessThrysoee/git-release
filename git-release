@@ -163,7 +163,7 @@ f,force       replace the tag if exists"
 
    # on 'release/major.minor'
    echo "Tagging branch with version: $CURR_VERSION"
-   git tag "$@" $CURR_VERSION
+   git tag --annotate --message $CURR_VERSION "$@" $CURR_VERSION
    update_version $NEXT_VERSION $RELEASE_VERSION_POSTFIX
    git add $GIT_RELEASE_PROPERTIES
    git add -u
